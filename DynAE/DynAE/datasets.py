@@ -5,6 +5,7 @@ import matplotlib.image as mpimg
 import os
 import math 
 import pandas as pd
+import cv2
 
 def rgb2gray(rgb):
     #convert image from rgp to grayscale
@@ -382,6 +383,55 @@ def load_stl(data_path='/content/drive/My Drive/Colab/DAE/data/stl'):
 
     return features, y
 
+def load_handwriting(data_path=None):
+    # cache 파일이 존재하는지 확인
+    import glob
+    import json
+    if not os.path.exists(data_path + '/data.npy'):
+        #TODO 읽어와서 resizing한 후에 dictionary 참고해서 label idx 달기
+
+        # Dictionary loading.
+        syllable_to_label = {}    # 음절을 label로 바꾸는 dict
+        id_to_label = {}          # id를 label로 바꾸는 dict
+        with open(data_path + '/handwriting_data_info1.json', encoding='utf-8') as f:
+            s = json.load(f)
+            count = 0
+            for image, item in zip(s['images'], s['annotations']):
+                if item['attributes']['type'] == '글자(음절)':
+                    if item['text'] not in syllable_to_label:
+                        syllable_to_label[item['text']] = count
+                    count += 1
+                    id_to_label[image['id']] = syllable_to_label[item['text']]
+
+        images = glob.glob(data_path + '/*.png')
+        X, Y = [], []
+        for img in images:
+            src = cv2.cvtColor(cv2.imread(img), cv2.COLOR_BGR2GRAY) # load img into gray scale
+            #TODO 적절한 resize value를 찾아야함. 우선 square 형태는 필수라고 생각
+            dst = cv2.resize(src, dsize=(28, 28), interpolation=cv2.INTER_LINEAR)
+            id = img.split('/')[-1].split('.')[0]  # id 부분만 떼어냄
+            idx = id_to_label[id]  # id => 몇 번째 label인지로 mapping
+            X.append(dst)
+            Y.append(idx)
+        X = np.array(X)
+        Y = np.array(Y, dtype=int)
+        p = np.random.permutation(X.shape[0])
+        X = X[p]
+        Y = Y[p]
+        X = X.reshape([-1, 28, 28, 1]) / 255.0
+        # Saving
+        data = {'X': X, 'Y': Y}
+        file_name = data_path + '/data.npy'
+        np.save(file_name, data)
+    else:
+        # Loading
+        file_name = data_path + '/data.npy'
+        data = np.load(file_name, allow_pickle=True)[()]
+        X = data['X']
+        Y = data['Y']
+    print("handwriting samples", X.shape)
+    return X, Y
+
 def load_data_conv(dataset, datapath):
     if dataset == 'mnist':
         return load_mnist()
@@ -407,6 +457,8 @@ def load_data_conv(dataset, datapath):
         return load_coil_100_color(datapath)
     elif dataset == 'mice-protein':
         return load_mice_protein(datapath)
+    elif dataset == 'handwriting':
+        return load_handwriting(datapath)
     else:
         raise ValueError('Not defined for loading %s' % dataset)
 
