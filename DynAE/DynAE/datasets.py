@@ -383,7 +383,7 @@ def load_stl(data_path='/content/drive/My Drive/Colab/DAE/data/stl'):
 
     return features, y
 
-def load_handwriting(data_path=None):
+def load_handwriting(data_path):
     # cache 파일이 존재하는지 확인
     import glob
     import json
@@ -427,6 +427,62 @@ def load_handwriting(data_path=None):
         # Loading
         file_name = data_path + '/data.npy'
         data = np.load(file_name, allow_pickle=True)[()]
+        X = data['X']
+        Y = data['Y']
+    print("handwriting samples", X.shape)
+    return X, Y
+
+def load_specific_handwriting(data_path, syallble_list, width=28, max_samples=1000, n_clusters=10):
+    import glob
+    import json
+    cache_name = data_path.rsplit('/', 1)[0] + '/cache/data_' + str(len(syallble_list)) + '_' + str(width) + '.npy'
+    if not os.path.exists(cache_name):
+        #TODO 데이터 비스무리하게 생긴것들만 꺼내보자 ex) 가, 나, 다, 라
+
+        # Dictionary loading.
+        syllable_to_label = {}
+        id_to_label = {}
+        with open(data_path + '/handwriting_data_info1.json', 'r', encoding='utf-8') as f:
+            s = json.load(f)
+            count = 0
+            for image, item in zip(s['images'], s['annotations']):
+                if item['attributes']['type'] == '글자(음절)':
+                    if item['text'] not in syallble_list:
+                        continue
+                    if item['text'] not in syllable_to_label:
+                        syllable_to_label[item['text']] = count
+                    count += 1
+                    id_to_label[image['id']] = syllable_to_label[item['text']]
+
+        images = glob.glob(data_path + '/*.png')
+        X, Y = [], []
+        for img in images:
+            id = img.split('/')[-1].split('.')[0]  # id 부분만 떼어냄
+            if id in id_to_label:
+                idx = id_to_label[id]  # id => 몇 번째 label인지로 mapping
+            else:
+                continue
+
+            src = cv2.cvtColor(cv2.imread(img), cv2.COLOR_BGR2GRAY)  # load img into gray scale
+            # TODO 적절한 resize value를 찾아야함. 우선 square 형태는 필수라고 생각
+            dst = cv2.resize(src, dsize=(width, width), interpolation=cv2.INTER_LINEAR)
+
+            X.append(dst)
+            Y.append(idx)
+        X = np.array(X)
+        Y = np.array(Y, dtype=int)
+        p = np.random.permutation(X.shape[0])
+        X = X[p]
+        Y = Y[p]
+        X = X.reshape([-1, width, width, 1]) / 255.0
+        # Saving
+        data = {'X': X, 'Y': Y}
+        # file_name = data_path + '/data.npy'
+        np.save(cache_name, data)
+    else:
+        # Loading
+        # file_name = data_path + '/data.npy'
+        data = np.load(cache_name, allow_pickle=True)[()]
         X = data['X']
         Y = data['Y']
     print("handwriting samples", X.shape)

@@ -424,6 +424,8 @@ class DynAE:
         delta_kappa = 0.3 * kappa
         sess = tf.keras.backend.get_session()
         for ite in tqdm(range(int(maxiter))):
+            if ite == 139:
+                print("wow")
             if ite % validate_interval == 0:
                 x_emb = self.encoder.predict(x)
                 q = q_mat(x_emb, centers_emb)
@@ -582,6 +584,12 @@ class DynAE:
         km = KMeans(n_clusters=len(np.unique(y)), n_init=20)
         y_pred = km.fit_predict(features)
         print(' '*8 + '|==>  acc: %.4f,  nmi: %.4f  <==|'% (metrics.acc(y, y_pred), metrics.nmi(y, y_pred)))
+
+    def predict_y(self, x, n_cluster=10):
+        features = self.predict_encoder(x)
+        km = KMeans(n_clusters=n_cluster, n_init=20)
+        y_pred = km.fit_predict(features)
+        return y_pred
 
     def compute_nb_conflicted_data(self, x, centers_emb, beta1, beta2):
         unconf_indices, conf_indices = self.generate_unconflicted_data_index(x, centers_emb, beta1, beta2)
